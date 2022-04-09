@@ -1,0 +1,2 @@
+email:irina@mail.com,firstName:lucas,lastName:martinez,password:lucas123; 
+email:lucas@mail.com,firstName:lucas,lastName:perez,password:irina123; 
