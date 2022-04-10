@@ -1,5 +1,6 @@
 const fs = require('fs');
 const express = require('express');
+const https = require('https');
 const app = express();
 
 app.use(express.json()); 
@@ -61,13 +62,87 @@ app.post("/authUser", (req, res) => {
                 token += characters.charAt(Math.floor(Math.random() * characters.length));
             }
 
-            fs.appendFile('tokens.txt', req.body.email + ',' + token + '; \n'
+            fs.appendFile('tokens.txt', 'email:' + req.body.email + ',' + 'token:' + token + ';\n'
                             ,function (err) {
                 if (err) throw err;
                 console.log('Saved!');
             });
 
             res.status(200).send(token);
+            return;
+        }
+
+        res.status(400).send("The email address is invalid!");
+    });
+})  
+
+
+const movies = {
+    "movie1" : {
+        "name" : "Titanic",
+        "score" : 12
+    },
+
+    "movie2" : {
+        "name" : "Django",
+        "score" : 25
+    },
+
+    "movie3" : {
+        "name" : "Watchdogs",
+        "score" : 45
+    },
+
+    "movie4" : {
+        "name" : "No Country for old Man",
+        "score" : 76
+    },
+
+    "movie5" : {
+        "name" : "Fast and Furious",
+        "score" : 5
+    },
+};
+
+//Obtener Peliculas
+app.get("/getMovies/:email/:token", (req, res) => {     
+    https.get('https://api.themoviedb.org/3/movie/top_rated?api_key=69ccff162bcfc72e764ae9fc093e575f', (resp) => {
+        let data = '';
+
+        // A chunk of data has been received.
+        resp.on('data', (chunk) => {
+            data += chunk;
+        });
+
+        // The whole response has been received. Print out the result.
+        resp.on('end', () => {
+            console.log(JSON.parse(data));
+        });
+
+        }).on("error", (err) => {
+        console.log("Error: " + err.message);
+    });
+
+    let userEmail = req.params.email;
+    fs.readFile("tokens.txt", "utf-8", (err, data) => {
+        //Email verification
+        found = data.search(userEmail);
+
+        console.log(found);
+        if (found != -1) {
+            //Token authentication
+            let tokenStart = data.indexOf(':', data.indexOf('token', found));
+            let tokenEnd = data.indexOf(';', tokenStart);
+
+            console.log(data.substring(tokenStart+1, tokenEnd))
+
+            if (data.substring(tokenStart+1, tokenEnd) != req.params.token) {
+                res.status(400).send("The token is invalid!");
+
+                return;
+            }
+
+            res.status(200).send(movies);
             return;
         }
 
