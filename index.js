@@ -1,9 +1,15 @@
 const fs = require('fs');
 const express = require('express');
 const https = require('https');
+const { mainModule } = require('process');
 const app = express();
 
 app.use(express.json()); 
+
+fs.writeFile("favoritos.txt", "{}", (err) => {
+    if (err)
+      console.log(err);
+  });
 
 //Registrar Usuario
 app.post("/addUser", (req, res) => {
@@ -76,6 +82,8 @@ app.post("/authUser", (req, res) => {
     });
 })  
 
+var movies = [];
+
 
 //Obtener Peliculas
 app.get("/getMovies/:email/:token", (req, res) => {     
@@ -90,7 +98,7 @@ app.get("/getMovies/:email/:token", (req, res) => {
         // The whole response has been received. Print out the result.
         resp.on('end', () => {
             let moviesResponse = [];
-            const movies = JSON.parse(data);
+            movies = JSON.parse(data);
 
             for (var i = 0; i < movies.results.length; i++) {
                 movies.results[i]['suggestionScore'] = Math.floor(Math.random() * 99);
@@ -102,26 +110,26 @@ app.get("/getMovies/:email/:token", (req, res) => {
 
             let userEmail = req.params.email;
             fs.readFile("tokens.txt", "utf-8", (err, data) => {
-            //Email verification
-            found = data.search(userEmail);
-    
-            if (found != -1) {
-                //Token authentication
-                let tokenStart = data.indexOf(':', data.indexOf('token', found));
-                let tokenEnd = data.indexOf(';', tokenStart);
-    
-                if (data.substring(tokenStart+1, tokenEnd) != req.params.token) {
-                    res.status(400).send("The token is invalid!");
-    
+                //Email verification
+                found = data.search(userEmail);
+        
+                if (found != -1) {
+                    //Token authentication
+                    let tokenStart = data.indexOf(':', data.indexOf('token', found));
+                    let tokenEnd = data.indexOf(';', tokenStart);
+        
+                    if (data.substring(tokenStart+1, tokenEnd) != req.params.token) {
+                        res.status(400).send("The token is invalid!");
+        
+                        return;
+                    }
+        
+                    res.status(200).send(moviesResponse);
                     return;
                 }
-    
-                res.status(200).send(moviesResponse);
-                return;
-            }
-    
-            res.status(400).send("The email address is invalid!");
-        });
+        
+                res.status(400).send("The email address is invalid!");
+            });
         });
 
     }).on("error", (err) => {
@@ -129,4 +137,55 @@ app.get("/getMovies/:email/:token", (req, res) => {
     });
 })  
 
+
+//Agregar Pelicula a Favoritos
+app.post("/addFavoriteMovie/:email/:token", (req, res) => {
+    let userEmail = req.params.email;
+    fs.readFile("tokens.txt", "utf-8", (err, data) => {
+    //Email verification
+    found = data.search(userEmail);
+
+    if (found != -1) {
+        //Token authentication
+        let tokenStart = data.indexOf(':', data.indexOf('token', found));
+        let tokenEnd = data.indexOf(';', tokenStart);
+
+        if (data.substring(tokenStart+1, tokenEnd) != req.params.token) {
+            res.status(400).send("The token is invalid!");
+
+            return;
+        }
+
+        fs.readFile("favoritos.txt", "utf-8", (err, data) => {
+            favFound = data.search(userEmail);
+            favoritos = JSON.parse(data);
+
+            if (favFound != -1) {
+                console.log("agrega a la existente");
+                (favoritos[userEmail]).push(req.body);
+            }else {
+                const arrayToAdd = [].push(req.body)
+                console.log(req.body);
+                favoritos[userEmail] = [];
+                favoritos[userEmail].push(req.body)
+            }
+            fs.writeFile("favoritos.txt", JSON.stringify(favoritos), (err) => {
+                if (err)
+                  console.log(err);
+                else {
+                  console.log("File written successfully\n");
+                }
+              });
+
+            console.log(favoritos);
+        });
+        res.status(200).send("The movie was added to the favorite list of " + userEmail);
+        return;
+    }
+
+    res.status(400).send("The email address is invalid!");
+});
+})  
+
 app.listen(8080, () => {console.log("Listening on port 8080")});
+
