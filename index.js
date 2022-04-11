@@ -77,33 +77,6 @@ app.post("/authUser", (req, res) => {
 })  
 
 
-const movies = {
-    "movie1" : {
-        "name" : "Titanic",
-        "score" : 12
-    },
-
-    "movie2" : {
-        "name" : "Django",
-        "score" : 25
-    },
-
-    "movie3" : {
-        "name" : "Watchdogs",
-        "score" : 45
-    },
-
-    "movie4" : {
-        "name" : "No Country for old Man",
-        "score" : 76
-    },
-
-    "movie5" : {
-        "name" : "Fast and Furious",
-        "score" : 5
-    },
-};
-
 //Obtener Peliculas
 app.get("/getMovies/:email/:token", (req, res) => {     
     https.get('https://api.themoviedb.org/3/movie/top_rated?api_key=69ccff162bcfc72e764ae9fc093e575f', (resp) => {
@@ -116,37 +89,43 @@ app.get("/getMovies/:email/:token", (req, res) => {
 
         // The whole response has been received. Print out the result.
         resp.on('end', () => {
-            console.log(JSON.parse(data));
-        });
+            let moviesResponse = [];
+            const movies = JSON.parse(data);
 
-        }).on("error", (err) => {
-        console.log("Error: " + err.message);
-    });
-
-    let userEmail = req.params.email;
-    fs.readFile("tokens.txt", "utf-8", (err, data) => {
-        //Email verification
-        found = data.search(userEmail);
-
-        console.log(found);
-        if (found != -1) {
-            //Token authentication
-            let tokenStart = data.indexOf(':', data.indexOf('token', found));
-            let tokenEnd = data.indexOf(';', tokenStart);
-
-            console.log(data.substring(tokenStart+1, tokenEnd))
-
-            if (data.substring(tokenStart+1, tokenEnd) != req.params.token) {
-                res.status(400).send("The token is invalid!");
-
-                return;
+            for (var i = 0; i < movies.results.length; i++) {
+                movies.results[i]['suggestionScore'] = Math.floor(Math.random() * 99);
+                
+                moviesResponse.push(movies.results[i]);
             }
 
-            res.status(200).send(movies);
-            return;
-        }
+            moviesResponse.sort((a,b) => b.suggestionScore - a.suggestionScore)
 
-        res.status(400).send("The email address is invalid!");
+            let userEmail = req.params.email;
+            fs.readFile("tokens.txt", "utf-8", (err, data) => {
+            //Email verification
+            found = data.search(userEmail);
+    
+            if (found != -1) {
+                //Token authentication
+                let tokenStart = data.indexOf(':', data.indexOf('token', found));
+                let tokenEnd = data.indexOf(';', tokenStart);
+    
+                if (data.substring(tokenStart+1, tokenEnd) != req.params.token) {
+                    res.status(400).send("The token is invalid!");
+    
+                    return;
+                }
+    
+                res.status(200).send(moviesResponse);
+                return;
+            }
+    
+            res.status(400).send("The email address is invalid!");
+        });
+        });
+
+    }).on("error", (err) => {
+        console.log("Error: " + err.message);
     });
 })  
 
