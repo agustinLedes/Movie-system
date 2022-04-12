@@ -6,56 +6,66 @@ const app = express();
 
 app.use(express.json()); 
 
-fs.writeFile("favoritos.txt", "{}", (err) => {
-    if (err)
-      console.log(err);
-});
+if (!fs.existsSync('favoritos.txt')) {
+    fs.writeFile("favoritos.txt", "{}", (err) => {
+        if (err)
+            console.log(err);
+    });
+}
 
-fs.writeFile("users.txt", "{ \"usersNumber\" : 0}", (err) => {
-    if (err)
-        console.log(err);
-});
+if (!fs.existsSync('users.txt')) {
+    fs.writeFile("users.txt", '{ \"usersNumber\" : 0}', (err) => {
+        if (err)
+            console.log(err);
+    });
+}
 
-fs.writeFile("tokens.txt", "{ \"userTokens\" : [] }", (err) => {
-    if (err)
-        console.log(err);
-});
+if (!fs.existsSync('tokens.txt')) {
+    fs.writeFile("tokens.txt", "{ \"userTokens\" : [] }", (err) => {
+        if (err)
+            console.log(err);
+    });
+}
+
 
 //Registrar Usuario
 app.post("/addUser", (req, res) => {
     let userEmail = req.body.email;
     fs.readFile("users.txt", "utf-8", found = (err, data) => {
-        found = data.search(userEmail);
+        found = data.search('\"' + userEmail + '\"');
 
         if (found == -1) {
-            let users = JSON.parse(data);
+            if (req.body.password != "") {
+                let users = JSON.parse(data);
 
-            users.usersNumber++;
-            users['user' + users.usersNumber] = req.body;
-            fs.writeFile("users.txt", JSON.stringify(users), (err) => {
-                if (err)
-                  console.log(err);
-                else {
-                  console.log("User registered successfully!\n");
-                }
-              });
-            res.status(200).send("User registered successfully!");
-            return;
+                users.usersNumber++;
+                users['user' + users.usersNumber] = req.body;
+                fs.writeFile("users.txt", JSON.stringify(users), (err) => {
+                    if (err)
+                    console.log(err);
+                    else {
+                    console.log("User registered successfully!\n");
+                    }
+                });
+                res.status(200).send("User registered successfully!");
+                return;
+            }
+            res.status(400).send("Can't Register a user without a password!");
         }
 
         res.status(400).send("The email is already in use!");
-        });
+    });
 })  
 
 
 //Autenticar Usuario
-app.post("/authUser", (req, res) => {
+app.post("/authUser", (req, res) => {  
     const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
     let userEmail = req.body.email;
     fs.readFile("users.txt", "utf-8", (err, data) => {
         //Email verification
-        found = data.search(userEmail);
+        found = data.search('\"' + userEmail + '\"');
 
         console.log(found);
         if (found != -1) {
@@ -81,14 +91,13 @@ app.post("/authUser", (req, res) => {
             }
 
             fs.readFile("tokens.txt", "utf-8", (err, data) => {
-                tokenFound = data.search(userEmail);
+                tokenFound = data.search('\"' + userEmail + '\"');
                 tokens = JSON.parse(data);
 
                 if (tokenFound != -1) {
                    for (i = 0; i < tokens.userTokens.length; i++) {
-                        console.log(tokens.userTokens[i].userEmail)
                         if (tokens.userTokens[i].userEmail == userEmail)
-                        tokens.userTokens[i].tokenValue = token;
+                            tokens.userTokens[i].tokenValue = token;
                     }
                 }else {
                     const authenticationPair = {"userEmail" : userEmail, "tokenValue" : token}
@@ -113,8 +122,6 @@ app.post("/authUser", (req, res) => {
     });
 })  
 
-var movies = [];
-
 
 //Obtener Peliculas
 app.get("/getMovies/:email/:token", (req, res) => {     
@@ -128,92 +135,91 @@ app.get("/getMovies/:email/:token", (req, res) => {
         resp.on('end', () => {
             let moviesResponse = [];
             movies = JSON.parse(data);
-
-            for (var i = 0; i < movies.results.length; i++) {
-                movies.results[i]['suggestionScore'] = Math.floor(Math.random() * 99);
-                
-                moviesResponse.push(movies.results[i]);
-            }
-
-            moviesResponse.sort((a,b) => b.suggestionScore - a.suggestionScore)
-
             let userEmail = req.params.email;
+            let userToken = req.params.token;
             fs.readFile("tokens.txt", "utf-8", (err, data) => {
-                //Email verification
-                found = data.search(userEmail);
-        
-                if (found != -1) {
+                //User Validation
+                found = data.search('\"' + userEmail + '\"');
+    
+                if (found != -1) {  
                     //Token authentication
-                    let tokenStart = data.indexOf(':', data.indexOf('token', found));
-                    let tokenEnd = data.indexOf(';', tokenStart);
-        
-                    if (data.substring(tokenStart+1, tokenEnd) != req.params.token) {
-                        res.status(400).send("The token is invalid!");
-        
-                        return;
+                    tokens = JSON.parse(data);
+                    for (i = 0; i < tokens.userTokens.length; i++) {
+                        if ((tokens.userTokens[i].userEmail == userEmail) && (tokens.userTokens[i].tokenValue != userToken)) {
+                            res.status(400).send("The token is invalid!");
+    
+                            return;
+                        }
                     }
-        
+
+                    for (var i = 0; i < movies.results.length; i++) {
+                        movies.results[i]['suggestionScore'] = Math.floor(Math.random() * 99);
+                        
+                        moviesResponse.push(movies.results[i]);
+                    }
+                    moviesResponse.sort((a,b) => b.suggestionScore - a.suggestionScore)
                     res.status(200).send(moviesResponse);
                     return;
                 }
-        
+                
                 res.status(400).send("The email address is invalid!");
+                return;
             });
         });
-
-    }).on("error", (err) => {
-        console.log("Error: " + err.message);
     });
-})  
+}).on("error", (err) => {
+    console.log("Error: " + err.message);
+});
 
 
 //Agregar Pelicula a Favoritos
 app.post("/addFavoriteMovie/:email/:token", (req, res) => {
     let userEmail = req.params.email;
+    let userToken = req.params.token;
     fs.readFile("tokens.txt", "utf-8", (err, data) => {
-    //Email verification
-    found = data.search(userEmail);
+        //Email verification
+        found = data.search('\"' + userEmail + '\"');
 
-    if (found != -1) {
-        //Token authentication
-        let tokenStart = data.indexOf(':', data.indexOf('token', found));
-        let tokenEnd = data.indexOf(';', tokenStart);
+        console.log(found);
+        if (found != -1) {
+            //Token authentication
+            tokens = JSON.parse(data);
+            for (i = 0; i < tokens.userTokens.length; i++) {
+                if ((tokens.userTokens[i].userEmail == userEmail) && (tokens.userTokens[i].tokenValue != userToken)) {
+                    res.status(400).send("The token is invalid!");
 
-        if (data.substring(tokenStart+1, tokenEnd) != req.params.token) {
-            res.status(400).send("The token is invalid!");
+                    return;
+                }
+            }
 
+            fs.readFile("favoritos.txt", "utf-8", (err, data) => {
+                favFound = data.search(userEmail);
+                favoritos = JSON.parse(data);
+                req.body.addedAt = new Date().toString();
+
+                if (favFound != -1) {
+                    (favoritos[userEmail]).push(req.body);
+                }else {
+                    const arrayToAdd = [].push(req.body)
+                    console.log(req.body);
+                    favoritos[userEmail] = [];
+                    favoritos[userEmail].push(req.body)
+                }
+                fs.writeFile("favoritos.txt", JSON.stringify(favoritos), (err) => {
+                    if (err)
+                    console.log(err);
+                    else {
+                    console.log("File written successfully\n");
+                    }
+                });
+
+                console.log(favoritos);
+            });
+            res.status(200).send("The movie was added to the favorite list of " + userEmail);
             return;
         }
 
-        fs.readFile("favoritos.txt", "utf-8", (err, data) => {
-            favFound = data.search(userEmail);
-            favoritos = JSON.parse(data);
-            req.body.addedAt = new Date().toString();
-
-            if (favFound != -1) {
-                console.log("agrega a la existente");
-                (favoritos[userEmail]).push(req.body);
-            }else {
-                const arrayToAdd = [].push(req.body)
-                console.log(req.body);
-                favoritos[userEmail] = [];
-                favoritos[userEmail].push(req.body)
-            }
-            fs.writeFile("favoritos.txt", JSON.stringify(favoritos), (err) => {
-                if (err)
-                  console.log(err);
-                else {
-                  console.log("File written successfully\n");
-                }
-              });
-
-            console.log(favoritos);
-        });
-        res.status(200).send("The movie was added to the favorite list of " + userEmail);
-        return;
-    }
-
-    res.status(400).send("The email address is invalid!");
+        res.status(400).send("The email address is invalid!");
 });
 })  
 
@@ -222,32 +228,32 @@ app.post("/addFavoriteMovie/:email/:token", (req, res) => {
 app.get("/getFavoriteMovies/:email/:token", (req, res) => {     
     fs.readFile("favoritos.txt", "utf-8", (err, data) => {
         let userEmail = req.params.email;
+        let userToken = req.params.token;
         let moviesResponse = [];
         movies = JSON.parse(data);
 
-        for (var i = 0; i < (movies[userEmail]).length; i++) {
-            movies[userEmail][i]['suggestionForTodayScore'] = Math.floor(Math.random() * 99);
-            
-            moviesResponse.push(movies[userEmail][i]);
-        }
-
-        moviesResponse.sort((a,b) => b.suggestionForTodayScore - a.suggestionForTodayScore)
-
         fs.readFile("tokens.txt", "utf-8", (err, data) => {
             //Email verification
-            found = data.search(userEmail);
+            found = data.search('\"' + userEmail + '\"');
     
             if (found != -1) {
                 //Token authentication
-                let tokenStart = data.indexOf(':', data.indexOf('token', found));
-                let tokenEnd = data.indexOf(';', tokenStart);
-    
-                if (data.substring(tokenStart+1, tokenEnd) != req.params.token) {
-                    res.status(400).send("The token is invalid!");
-    
-                    return;
+                tokens = JSON.parse(data);
+                for (i = 0; i < tokens.userTokens.length; i++) {
+                    if ((tokens.userTokens[i].userEmail == userEmail) && (tokens.userTokens[i].tokenValue != userToken)) {
+                        res.status(400).send("The token is invalid!");
+
+                        return;
+                    }
                 }
-    
+                for (var i = 0; i < (movies[userEmail]).length; i++) {
+                    movies[userEmail][i]['suggestionForTodayScore'] = Math.floor(Math.random() * 99);
+                    
+                    moviesResponse.push(movies[userEmail][i]);
+                }
+        
+                moviesResponse.sort((a,b) => b.suggestionForTodayScore - a.suggestionForTodayScore)
+
                 res.status(200).send(moviesResponse);
                 return;
             }
