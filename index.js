@@ -3,30 +3,11 @@ const express = require('express');
 const https = require('https');
 const { mainModule } = require('process');
 const app = express();
+const utilities = require('./utilities.js')
 
 app.use(express.json()); 
 
-if (!fs.existsSync('favoritos.txt')) {
-    fs.writeFile("favoritos.txt", "{}", (err) => {
-        if (err)
-            console.log(err);
-    });
-}
-
-if (!fs.existsSync('users.txt')) {
-    fs.writeFile("users.txt", '{ \"usersNumber\" : 0}', (err) => {
-        if (err)
-            console.log(err);
-    });
-}
-
-if (!fs.existsSync('tokens.txt')) {
-    fs.writeFile("tokens.txt", "{ \"userTokens\" : [] }", (err) => {
-        if (err)
-            console.log(err);
-    });
-}
-
+utilities.validateStorageFiles();
 
 //Registrar Usuario
 app.post("/addUser", (req, res) => {
@@ -135,23 +116,14 @@ app.get("/getMovies/:email/:token", (req, res) => {
         resp.on('end', () => {
             let moviesResponse = [];
             movies = JSON.parse(data);
-            let userEmail = req.params.email;
-            let userToken = req.params.token;
             fs.readFile("tokens.txt", "utf-8", (err, data) => {
-                //User Validation
-                found = data.search('\"' + userEmail + '\"');
-    
-                if (found != -1) {  
-                    //Token authentication
-                    tokens = JSON.parse(data);
-                    for (i = 0; i < tokens.userTokens.length; i++) {
-                        if ((tokens.userTokens[i].userEmail == userEmail) && (tokens.userTokens[i].tokenValue != userToken)) {
-                            res.status(400).send("The token is invalid!");
-    
-                            return;
-                        }
-                    }
-
+                let tokenValidation = utilities.verifyEmailTokenIsCorrect(req.params.email, req.params.token, data);
+                console.log('TV ' + tokenValidation);
+                if (tokenValidation == 'emailFail') {
+                    res.status(400).send("The email address is invalid!");
+                }else if (tokenValidation == 'tokenFail'){
+                    res.status(400).send("The token is invalid!");
+                }else {
                     for (var i = 0; i < movies.results.length; i++) {
                         movies.results[i]['suggestionScore'] = Math.floor(Math.random() * 99);
                         
@@ -159,10 +131,7 @@ app.get("/getMovies/:email/:token", (req, res) => {
                     }
                     moviesResponse.sort((a,b) => b.suggestionScore - a.suggestionScore)
                     res.status(200).send(moviesResponse);
-                    return;
                 }
-                
-                res.status(400).send("The email address is invalid!");
                 return;
             });
         });
@@ -175,27 +144,19 @@ app.get("/getMovies/:email/:token", (req, res) => {
 //Agregar Pelicula a Favoritos
 app.post("/addFavoriteMovie/:email/:token", (req, res) => {
     let userEmail = req.params.email;
-    let userToken = req.params.token;
+
     fs.readFile("tokens.txt", "utf-8", (err, data) => {
-        //Email verification
-        found = data.search('\"' + userEmail + '\"');
-
-        console.log(found);
-        if (found != -1) {
-            //Token authentication
-            tokens = JSON.parse(data);
-            for (i = 0; i < tokens.userTokens.length; i++) {
-                if ((tokens.userTokens[i].userEmail == userEmail) && (tokens.userTokens[i].tokenValue != userToken)) {
-                    res.status(400).send("The token is invalid!");
-
-                    return;
-                }
-            }
-
+        let tokenValidation = utilities.verifyEmailTokenIsCorrect(userEmail, req.params.token, data);
+        if (tokenValidation == 'emailFail') {
+            res.status(400).send("The email address is invalid!");
+        }else if (tokenValidation == 'tokenFail'){
+            res.status(400).send("The token is invalid!");
+        }else {
             fs.readFile("favoritos.txt", "utf-8", (err, data) => {
                 favFound = data.search(userEmail);
                 favoritos = JSON.parse(data);
-                req.body.addedAt = new Date().toString();
+                let date = new Date();
+                req.body.addedAt = date.getDate() + '/' + date.getMonth() + '/' + date.getFullYear();
 
                 if (favFound != -1) {
                     (favoritos[userEmail]).push(req.body);
@@ -218,34 +179,24 @@ app.post("/addFavoriteMovie/:email/:token", (req, res) => {
             res.status(200).send("The movie was added to the favorite list of " + userEmail);
             return;
         }
-
-        res.status(400).send("The email address is invalid!");
-});
+    });
 })  
 
 
 //Obtener Peliculas Favoritas
 app.get("/getFavoriteMovies/:email/:token", (req, res) => {     
     fs.readFile("favoritos.txt", "utf-8", (err, data) => {
-        let userEmail = req.params.email;
-        let userToken = req.params.token;
         let moviesResponse = [];
         movies = JSON.parse(data);
+        let userEmail = req.params.email;
 
         fs.readFile("tokens.txt", "utf-8", (err, data) => {
-            //Email verification
-            found = data.search('\"' + userEmail + '\"');
-    
-            if (found != -1) {
-                //Token authentication
-                tokens = JSON.parse(data);
-                for (i = 0; i < tokens.userTokens.length; i++) {
-                    if ((tokens.userTokens[i].userEmail == userEmail) && (tokens.userTokens[i].tokenValue != userToken)) {
-                        res.status(400).send("The token is invalid!");
-
-                        return;
-                    }
-                }
+            let tokenValidation = utilities.verifyEmailTokenIsCorrect(userEmail, req.params.token, data);
+            if (tokenValidation == 'emailFail') {
+                res.status(400).send("The email address is invalid!");
+            }else if (tokenValidation == 'tokenFail'){
+                res.status(400).send("The token is invalid!");
+            }else {
                 for (var i = 0; i < (movies[userEmail]).length; i++) {
                     movies[userEmail][i]['suggestionForTodayScore'] = Math.floor(Math.random() * 99);
                     
@@ -257,8 +208,6 @@ app.get("/getFavoriteMovies/:email/:token", (req, res) => {
                 res.status(200).send(moviesResponse);
                 return;
             }
-    
-            res.status(400).send("The email address is invalid!");
         });
     });
 })  
