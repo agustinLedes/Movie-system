@@ -7,7 +7,7 @@ Registrar usuario (Log on User), Autenticar usuario (Authenticate User), Obtener
 Obtener películas favoritas (Get favorite movies).
 
 
-Registrar Usuario:
+Registrar Usuario:>
   This is a HTTP Post operation, is called on the endpoint http://localhost:8080/addUser.
   The body of the request contains the user email (email), first name (firstName), last name (lastName) and password (password).
   The email and password field are required, all fields are string.
