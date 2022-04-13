@@ -79,4 +79,6 @@ Obtener películas favoritas (Get favorite movies).
   This is a HTTP Get operation, is called on the endpoint http://localhost:8080/getFavoriteMovies/:email/:token.  
   The email and token parameters are required.  
   If the email does't match any registered user email or the token is not correct for that user email the operation will fail.  
-  If the operation is successful it will return a list of the movies added to the favorite list of the user, ordered by a value called "suggestionForTodayScore".  
+  If the operation is successful it will return a list of the movies added to the favorite list of the user, ordered by a value called "suggestionForTodayScore". 
+  
+  PS: The only external framework used is express.
