@@ -26,6 +26,7 @@ const utilities = {
         return 'emailFail';
     },
 
+
     /******Validate the files for information storage are created,
            if not, creates them******/
     validateStorageFiles : function() {

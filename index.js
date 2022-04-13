@@ -15,25 +15,30 @@ app.post("/addUser", (req, res) => {
     fs.readFile("users.txt", "utf-8", found = (err, data) => {
         found = data.search('\"' + userEmail + '\"');
 
+        let emailValid = userEmail.indexOf('@') != -1 && userEmail.indexOf('.') != -1;
         if (found == -1) {
-            if (req.body.password != "") {
-                let users = JSON.parse(data);
+            if (emailValid) {
+                if (req.body.password != "") {
+                    let users = JSON.parse(data);
 
-                users.usersNumber++;
-                users['user' + users.usersNumber] = req.body;
-                fs.writeFile("users.txt", JSON.stringify(users), (err) => {
-                    if (err)
-                    console.log(err);
-                    else {
-                    console.log("User registered successfully!\n");
-                    }
-                });
-                res.status(200).send("User registered successfully!");
+                    users.usersNumber++;
+                    users['user' + users.usersNumber] = req.body;
+                    fs.writeFile("users.txt", JSON.stringify(users), (err) => {
+                        if (err)
+                        console.log(err);
+                        else {
+                        console.log("User registered successfully!\n");
+                        }
+                    });
+                    res.status(200).send("User registered successfully!");
+                    return;
+                }
+                res.status(400).send("Can't Register a user without a password!");
                 return;
             }
-            res.status(400).send("Can't Register a user without a password!");
+            res.status(400).send("The email format is invalid!");
+            return;
         }
-
         res.status(400).send("The email is already in use!");
     });
 })  
@@ -106,7 +111,7 @@ app.post("/authUser", (req, res) => {
 
 //Obtener Peliculas
 app.get("/getMovies/:email/:token", (req, res) => {     
-    https.get('https://api.themoviedb.org/3/movie/top_rated?api_key=69ccff162bcfc72e764ae9fc093e575f', (resp) => {
+    https.get('https://api.themoviedb.org/3/discover/movie?api_key=69ccff162bcfc72e764ae9fc093e575f&page=1&with_keywords=' + req.params.keyword, (resp) => {
         let data = '';
 
         resp.on('data', (chunk) => {
@@ -118,7 +123,6 @@ app.get("/getMovies/:email/:token", (req, res) => {
             movies = JSON.parse(data);
             fs.readFile("tokens.txt", "utf-8", (err, data) => {
                 let tokenValidation = utilities.verifyEmailTokenIsCorrect(req.params.email, req.params.token, data);
-                console.log('TV ' + tokenValidation);
                 if (tokenValidation == 'emailFail') {
                     res.status(400).send("The email address is invalid!");
                 }else if (tokenValidation == 'tokenFail'){
